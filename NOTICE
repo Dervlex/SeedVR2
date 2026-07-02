@@ -1,0 +1,32 @@
+SeedVR2 (vendored)
+==================
+
+This directory contains a vendored copy of the SeedVR2 inference core from:
+
+  Repository : https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler
+  Commit     : 4490bd1f482e026674543386bb2a4d176da245b9
+  Version    : 2.5.24
+  License    : Apache License 2.0 (see ./LICENSE)
+
+Underlying model by ByteDance-Seed (SeedVR2):
+  https://github.com/ByteDance-Seed/SeedVR
+  Weights: https://huggingface.co/numz/SeedVR2_comfyUI (license: apache-2.0)
+
+Local modifications
+-------------------
+- Only the reusable inference core under `src/` plus the fixed text-embedding
+  assets (`pos_emb.pt`, `neg_emb.pt`) and model configs (`configs_3b/`,
+  `configs_7b/`) are vendored. The ComfyUI node layer (`src/interfaces/`) was
+  removed because it hard-depends on `comfy_api` and is not used here.
+- `src/common/distributed/meta_init_utils.py` was removed as dead code (unused
+  by the image inference path).
+- `src/common/logger.py`: `get_logger` now attaches the shared stdout handler
+  only when it is not already present, to avoid duplicate log lines when it is
+  called repeatedly for the same logger name.
+- `src/optimization/memory_manager.py`: removed the module-level VRAM query and
+  `print` that ran at import time (startup latency + stdout noise in a server
+  context). `get_basic_vram_info()` is still available and used on demand.
+
+The core is invoked directly (no ComfyUI runtime) by `app/seedvr2_processor.py`.
+Import guards for ComfyUI (`folder_paths`, `comfy.model_management`) fall back
+cleanly when ComfyUI is absent.
