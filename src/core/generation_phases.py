@@ -680,7 +680,10 @@ def upscale_all_batches(
             base_noise = torch.randn_like(latent, dtype=ctx['compute_dtype'])
             
             noises = [base_noise]
-            aug_noises = [base_noise * 0.1 + torch.randn_like(base_noise) * 0.05]
+            # Full-variance independent aug noise (std 1.0), matching official ByteDance
+            # SeedVR2. Weak/correlated noise here only attenuates the SR conditioning
+            # (-> smoothing) instead of truly noising it for the model to restore detail.
+            aug_noises = [torch.randn_like(base_noise)]
             
             # Log latent noise application if enabled
             if latent_noise_scale > 0:
