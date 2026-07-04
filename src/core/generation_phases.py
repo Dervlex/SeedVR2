@@ -680,8 +680,7 @@ def upscale_all_batches(
             base_noise = torch.randn_like(latent, dtype=ctx['compute_dtype'])
             
             noises = [base_noise]
-            # Full-variance aug noise (std 1.0), matching official ByteDance SeedVR2.
-            aug_noises = [torch.randn_like(base_noise)]
+            aug_noises = [base_noise * 0.1 + torch.randn_like(base_noise) * 0.05]
             
             # Log latent noise application if enabled
             if latent_noise_scale > 0:
@@ -690,12 +689,11 @@ def upscale_all_batches(
             def _add_noise(x, aug_noise):
                 if latent_noise_scale == 0.0:
                     return x
-                # Resolution-independent (fal parity): injected noise fraction == t/T ==
-                # latent_noise_scale. No timestep_transform: its SD3 resolution shift
-                # (~38x at 16 MP) would make 0.08 fully regenerate the SR conditioning.
                 t = torch.tensor([1000.0], device=ctx['dit_device'], dtype=ctx['compute_dtype']) * latent_noise_scale
+                shape = torch.tensor(x.shape[1:], device=ctx['dit_device'])[None]
+                t = runner.timestep_transform(t, shape)
                 x = runner.schedule.forward(x, aug_noise, t)
-                del t
+                del t, shape
                 return x
             
             # Generate condition
