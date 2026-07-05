@@ -692,16 +692,19 @@ def upscale_all_batches(
             def _add_noise(x, aug_noise):
                 if latent_noise_scale == 0.0:
                     return x
-                t = torch.tensor([1000.0], device=ctx['dit_device'], dtype=ctx['compute_dtype']) * latent_noise_scale
-                # Latents are channels-last (T, H, W, C) after optimized_channels_to_last
-                # in vae_encode, so the spatial shape for timestep_transform is x.shape[:-1]
-                # == (T, H, W), matching na.flatten. Using x.shape[1:] here fed (H, W, C),
-                # forcing every still image down the video-shift branch and inflating the
-                # effective noise (e.g. 0.1 -> ~0.35 at 1080p).
-                shape = torch.tensor(x.shape[:-1], device=ctx['dit_device'])[None]
-                t = runner.timestep_transform(t, shape)
+                # Resolution-independent conditioning noise, matching FAL's noise_scale.
+                # With the LinearInterpolation (SD3/rectified-flow) schedule the blend is
+                #   x = (1 - t/T) * x_0 + (t/T) * aug_noise,
+                # so t = T * noise_scale injects exactly `noise_scale` of augmentation noise
+                # regardless of the rendered resolution.
+                #
+                # We deliberately skip runner.timestep_transform on the conditioning: its SD3
+                # shift grows with the output resolution (~5.5 @1080p, ~38 @4K), which turned
+                # the 0-1 knob unusable at high scale (0.08 -> ~0.77 injected @4K). FAL renders
+                # at scale too yet stays controllable up to 1.0, i.e. its noise_scale is linear.
+                t = torch.tensor([runner.schedule.T], device=ctx['dit_device'], dtype=ctx['compute_dtype']) * latent_noise_scale
                 x = runner.schedule.forward(x, aug_noise, t)
-                del t, shape
+                del t
                 return x
             
             # Generate condition
