@@ -693,7 +693,12 @@ def upscale_all_batches(
                 if latent_noise_scale == 0.0:
                     return x
                 t = torch.tensor([1000.0], device=ctx['dit_device'], dtype=ctx['compute_dtype']) * latent_noise_scale
-                shape = torch.tensor(x.shape[1:], device=ctx['dit_device'])[None]
+                # Latents are channels-last (T, H, W, C) after optimized_channels_to_last
+                # in vae_encode, so the spatial shape for timestep_transform is x.shape[:-1]
+                # == (T, H, W), matching na.flatten. Using x.shape[1:] here fed (H, W, C),
+                # forcing every still image down the video-shift branch and inflating the
+                # effective noise (e.g. 0.1 -> ~0.35 at 1080p).
+                shape = torch.tensor(x.shape[:-1], device=ctx['dit_device'])[None]
                 t = runner.timestep_transform(t, shape)
                 x = runner.schedule.forward(x, aug_noise, t)
                 del t, shape
