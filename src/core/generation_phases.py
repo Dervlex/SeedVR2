@@ -560,10 +560,11 @@ def upscale_all_batches(
         debug: Debug instance for logging (required)
         progress_callback: Optional callback(current, total, frames, phase_name)
         seed: Random seed for reproducible generation
-        latent_noise_scale: Noise scale for latent space augmentation (0.0-1.0).
-                           Adds noise during diffusion conditioning. Can soften details
-                           but may help with certain artifacts. 0.0 = no noise (crisp),
-                           1.0 = maximum noise (softer)
+        latent_noise_scale: Denoise-strength-style conditioning augmentation (0.0-1.0).
+                           latent_blur = (1 - scale)*latent + scale*noise. 0.0 keeps the
+                           SR reference fully intact (most faithful); higher values let the
+                           model restore/add detail while the output stays sharp. This is
+                           the equivalent of fal's `noise_scale` (resolution-independent).
         cache_model: If True, keep DiT model for reuse instead of deleting it
         
     Returns:
@@ -680,9 +681,10 @@ def upscale_all_batches(
             base_noise = torch.randn_like(latent, dtype=ctx['compute_dtype'])
             
             noises = [base_noise]
-            # Full-variance independent aug noise (std 1.0), matching official ByteDance
-            # SeedVR2. Weak/correlated noise here only attenuates the SR conditioning
-            # (-> smoothing) instead of truly noising it for the model to restore detail.
+            # Full-variance, independent aug noise (std 1.0), as in official ByteDance
+            # SeedVR2. Weak/correlated noise (base_noise*0.1 + randn*0.05, std ~0.11)
+            # makes schedule.forward only *attenuate* the SR conditioning toward zero
+            # (-> washout) instead of actually noising it for the model to restore from.
             aug_noises = [torch.randn_like(base_noise)]
             
             # Log latent noise application if enabled
@@ -692,11 +694,20 @@ def upscale_all_batches(
             def _add_noise(x, aug_noise):
                 if latent_noise_scale == 0.0:
                     return x
+                # Denoise-strength conditioning: latent_blur = (1 - s)*latent + s*noise
+                # (s = latent_noise_scale, since schedule.forward = (1 - t/T)*x + (t/T)*noise
+                # and T = 1000). s=0 keeps the SR reference intact; higher s frees the model
+                # to restore detail while output stays sharp. This is fal's noise_scale.
+                #
+                # No timestep_transform on purpose: latent_blur is STATIC conditioning (fixed
+                # for all sampling steps), not a per-step timestep, so the SD3 shift does not
+                # belong here. That shift is also resolution-dependent (~3x at 1MP, ~38x at
+                # 16MP) so a fixed knob would explode at high output res, and the old call
+                # passed x.shape[1:] = (H, W, C) instead of (T, H, W), forcing every image
+                # into the video-shift branch (~0.7 effective noise at scale 0.35).
                 t = torch.tensor([1000.0], device=ctx['dit_device'], dtype=ctx['compute_dtype']) * latent_noise_scale
-                shape = torch.tensor(x.shape[1:], device=ctx['dit_device'])[None]
-                t = runner.timestep_transform(t, shape)
                 x = runner.schedule.forward(x, aug_noise, t)
-                del t, shape
+                del t
                 return x
             
             # Generate condition
