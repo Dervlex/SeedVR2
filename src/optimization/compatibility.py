@@ -645,23 +645,18 @@ if not os.environ.get("SEEDVR2_OPTIMIZATIONS_LOGGED"):
     os.environ["SEEDVR2_OPTIMIZATIONS_LOGGED"] = "1"
     
     # Build status strings
-    sage_status = "✅" if SAGE_ATTN_AVAILABLE else "❌"
-    flash_status = "✅" if FLASH_ATTN_AVAILABLE else "❌"
-    triton_status = "✅" if TRITON_AVAILABLE else "❌"
+    sage_status = "available" if SAGE_ATTN_AVAILABLE else "unavailable"
+    flash_status = "available" if FLASH_ATTN_AVAILABLE else "unavailable"
+    triton_status = "available" if TRITON_AVAILABLE else "unavailable"
     
     # Count available optimizations
     available = [SAGE_ATTN_AVAILABLE, FLASH_ATTN_AVAILABLE, TRITON_AVAILABLE]
     num_available = sum(available)
     
-    if num_available == 3:
-        print(f"⚡ SeedVR2 optimizations check: SageAttention {sage_status} | Flash Attention {flash_status} | Triton {triton_status}")
-    elif num_available == 0:
-        print(f"⚠️  SeedVR2 optimizations check: SageAttention {sage_status} | Flash Attention {flash_status} | Triton {triton_status}")
-        print("💡 For best performance: pip install sageattention flash-attn triton")
-    else:
-        icon = "⚡" if num_available >= 2 else "⚠️ "
-        print(f"{icon} SeedVR2 optimizations check: SageAttention {sage_status} | Flash Attention {flash_status} | Triton {triton_status}")
-        
+    print(f"SeedVR2 optimizations check: SageAttention {sage_status} | Flash Attention {flash_status} | Triton {triton_status}")
+    if num_available == 0:
+        print("For best performance: pip install sageattention flash-attn triton")
+    elif num_available < 3:
         # Build install suggestions for missing packages
         missing = []
         if not SAGE_ATTN_AVAILABLE:
@@ -671,13 +666,13 @@ if not os.environ.get("SEEDVR2_OPTIMIZATIONS_LOGGED"):
         if not TRITON_AVAILABLE:
             missing.append("triton")
         if missing:
-            print(f"💡 Optional: pip install {' '.join(missing)}")
+            print(f"Optional: pip install {' '.join(missing)}")
     
     # Conv3d workaround status (if applicable)
     if NVIDIA_CONV3D_MEMORY_BUG_WORKAROUND:
         torch_ver = torch.__version__.split('+')[0]
         cudnn_ver = torch.backends.cudnn.version()
-        print(f"🔧 Conv3d workaround active: PyTorch {torch_ver}, cuDNN {cudnn_ver} (fixing VAE 3x memory bug)")
+        print(f"Conv3d workaround active: PyTorch {torch_ver}, cuDNN {cudnn_ver} (fixing VAE 3x memory bug)")
 
 
 # Bfloat16 CUBLAS support

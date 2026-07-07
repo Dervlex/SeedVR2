@@ -53,36 +53,6 @@ class Debug:
     - Force parameters for critical logs
     """
     
-    # Icon mapping for different categories
-    CATEGORY_ICONS = {
-        "general": "🔄",      # General operations/processing
-        "timing": "⚡",        # Performance timing
-        "memory": "📊",       # Memory usage tracking
-        "cache": "💾",        # Cache operations
-        "cleanup": "🧹",      # Cleanup operations
-        "setup": "🔧",        # Configuration/setup
-        "generation": "🎬",   # Generation process
-        "dit": "🚀",          # Model loading/operations
-        "blockswap": "🔀",    # BlockSwap operations
-        "download": "📥",     # Download operations
-        "success": "✅",      # Successful completion
-        "warning": "⚠️",      # Warnings
-        "error": "❌",        # Errors
-        "info": "ℹ️",         # Statistics/info
-        "tip" :"💡",          # Tip/suggestion
-        "video": "📹",        # Video/sequence info
-        "reuse": "♻️",        # Reusing/recycling
-        "runner": "🏃",       # Runner operations
-        "vae": "🎨",          # VAE operations\
-        "precision": "🎯",    # Precision
-        "device": "🖥️",       # Device info
-        "file": "📂",         # File operations
-        "alpha": "👻",        # Alpha operations
-        "starlove": "⭐💝",   # Star + love
-        "dialogue": "💬",     # Dialogue
-        "none" : "",
-    }
-    
     def __init__(self, enabled: bool = False, show_timestamps: bool = True):
         self.enabled = enabled
         self.show_timestamps = show_timestamps
@@ -116,30 +86,21 @@ class Debug:
         # Always log forced messages or if debugging is enabled - early return if not
         if not (self.enabled or force):
             return
-        
-        # Get icon for category, fallback to general icon
-        icon = self.CATEGORY_ICONS.get(category, self.CATEGORY_ICONS["general"])
-        
-        # Format prefix based on level
-        if level == "WARNING":
-            icon = self.CATEGORY_ICONS["warning"]
-        elif level == "ERROR":
-            icon = self.CATEGORY_ICONS["error"]
-        
-        # Build the log message with optional timestamp
+
+        # Build a clean, emoji-free prefix. Category icons are intentionally not
+        # rendered so logs stay readable in aggregators (Datadog etc.); the
+        # `category` arg is kept for API compatibility. Timestamp and level are
+        # the only prefixes.
+        segments = []
         if self.show_timestamps:
-            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            prefix = f"[{timestamp}] {icon}"
-        else:
-            prefix = f"{icon}"
-        
+            segments.append(f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}]")
         if level != "INFO":
-            prefix += f" [{level}]"
-        
-        # Add indentation
+            segments.append(f"[{level}]")
+
+        prefix = "".join(f"{segment} " for segment in segments)
         indent = " " * (indent_level * 2)
-        
-        print(f"{prefix} {indent}{message}", flush=True)
+
+        print(f"{prefix}{indent}{message}", flush=True)
 
     def print_header(self, cli: bool = False) -> None:
         """Print the header with banner - always displayed"""
@@ -158,12 +119,11 @@ class Debug:
         self.log("╚══════╝╚══════╝╚══════╝╚═════╝   ╚═══╝  ╚═╝  ╚═╝    ╚══════╝  ╚═╝ ╚══════╝", category="none", force=True, indent_level=1)
         # Version and credits - left/right aligned to logo width
         version_text = f"v{__version__}"
-        cli_indicator = "💻 CLI · " if cli else ""
+        cli_indicator = "CLI · " if cli else ""
         left_part = f"{cli_indicator}{version_text}"
         right_part = "© ByteDance Seed · NumZ · AInVFX"
         logo_width = 75
-        emoji_compensation = 1 if cli else 0
-        padding = logo_width - len(left_part) - len(right_part) - emoji_compensation
+        padding = logo_width - len(left_part) - len(right_part)
         self.log(f"{left_part}{' ' * max(1, padding)}{right_part}", category="none", force=True, indent_level=1)
         self.log("━" * logo_width, category="none", force=True, indent_level=1)
         self.log("", category="none", force=True)
@@ -226,16 +186,16 @@ class Debug:
                 fa_parts.append("3")
             if FLASH_ATTN_2_AVAILABLE:
                 fa_parts.append("2")
-            flash_str = f"v{','.join(fa_parts)} ✓" if fa_parts else "✗"
+            flash_str = f"v{','.join(fa_parts)}" if fa_parts else "unavailable"
             
             sa_parts = []
             if SAGE_ATTN_3_AVAILABLE:
                 sa_parts.append("3")
             if SAGE_ATTN_2_AVAILABLE:
                 sa_parts.append("2")
-            sage_str = f"v{','.join(sa_parts)} ✓" if sa_parts else "✗"
+            sage_str = f"v{','.join(sa_parts)}" if sa_parts else "unavailable"
             
-            triton_str = "✓" if TRITON_AVAILABLE else "✗"
+            triton_str = "available" if TRITON_AVAILABLE else "unavailable"
         except ImportError:
             flash_str = sage_str = triton_str = "?"
         
